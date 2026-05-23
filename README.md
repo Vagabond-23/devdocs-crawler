@@ -117,6 +117,3 @@ This crawler ONLY crawls allowlisted documentation sites:
 - `fastapi.tiangolo.com`
 - `kubernetes.io`
 
-## License
-
-MIT
