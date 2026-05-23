@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  # ───────────────────────────────────────────
+  # PostgreSQL — primary data store
+  # ───────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devdocs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devdocs_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-devdocs}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devdocs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────
+  # Redis — frontier queues, rate limiting, metrics
+  # ───────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────
+  # Meilisearch — full-text search engine
+  # ───────────────────────────────────────────
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-devdocs_meili_master_key}
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilidata:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────
+  # Backend API + Crawler Engine
+  # ───────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://devdocs:devdocs_secret@postgres:5432/devdocs}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-devdocs_meili_master_key}
+      CRAWLER_MAX_WORKERS: ${CRAWLER_MAX_WORKERS:-8}
+      CRAWLER_MAX_DEPTH: ${CRAWLER_MAX_DEPTH:-3}
+      CRAWLER_MAX_PAGES_PER_HOST: ${CRAWLER_MAX_PAGES_PER_HOST:-5000}
+      CRAWLER_DEFAULT_DELAY_MS: ${CRAWLER_DEFAULT_DELAY_MS:-1000}
+      CRAWLER_REQUEST_TIMEOUT: ${CRAWLER_REQUEST_TIMEOUT:-30}
+      CRAWLER_MAX_RETRIES: ${CRAWLER_MAX_RETRIES:-3}
+      CRAWLER_USER_AGENT: ${CRAWLER_USER_AGENT:-DevDocsCrawler/1.0}
+      CRAWLER_ALLOWED_HOSTS: ${CRAWLER_ALLOWED_HOSTS:-docs.python.org,developer.mozilla.org,fastapi.tiangolo.com,kubernetes.io}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+
+  # ───────────────────────────────────────────
+  # Frontend — Next.js search UI
+  # ───────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  redisdata:
+  meilidata:

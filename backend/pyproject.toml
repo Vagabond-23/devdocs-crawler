@@ -1,0 +1,57 @@
+[project]
+name = "devdocs-crawler"
+version = "0.1.0"
+description = "Distributed web crawler and search engine for documentation sites"
+requires-python = ">=3.12"
+dependencies = [
+    # --- Web Framework ---
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+
+    # --- Database ---
+    "sqlalchemy[asyncio]>=2.0.29",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+
+    # --- Redis ---
+    "redis[hiredis]>=5.0.0",
+
+    # --- HTTP Client ---
+    "httpx>=0.27.0",
+
+    # --- HTML Parsing ---
+    "selectolax>=0.3.21",
+
+    # --- Search ---
+    "meilisearch-python-sdk>=3.0.0",
+
+    # --- Configuration ---
+    "pydantic-settings>=2.2.0",
+
+    # --- Robots.txt ---
+    "protego>=0.3.0",
+
+    # --- Utilities ---
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "ANN", "ASYNC", "B", "SIM"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
